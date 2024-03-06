@@ -1,0 +1,1 @@
+docker run --detach -v ~/local-output-dir:/output bbb-recorder node export.js "URL" test.webm 0 true
