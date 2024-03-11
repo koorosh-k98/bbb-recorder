@@ -116,7 +116,7 @@ async function main() {
                     return document.getElementsByClassName("error-code")[0].textContent;
                 }
             });
-        } else  {
+        } else {
             pageMessage = await page.evaluate(() => {
                 if (document.getElementById("load-msg")) {
                     return document.getElementById("load-msg").textContent;
@@ -130,29 +130,34 @@ async function main() {
         }
 
         var recDuration;
-
-        // Get recording duration
-        if (bbbVersionIs23) {
-            // for some reason, in the latest versions of BBB, document.getElementById is evaluated BEFORE
-            // the DOM is fully loaded, which results in error
-            // Cannot read properties of null (reading 'duration')
-            // see https://github.com/jibon57/bbb-recorder/issues/100
-            // Quick fix : wait for 10 seconds before reading the duration
-            await page.waitFor(10000);
-            recDuration = await page.evaluate(() => {
-                return document.getElementById("vjs_video_3_html5_api").duration
-            });
-        } else {
-            recDuration = await page.evaluate(() => {
-                return document.getElementById("video").duration
-            });
-        }
+        var attempt = 0;
+        do {
+            // Get recording duration
+            if (bbbVersionIs23) {
+                // for some reason, in the latest versions of BBB, document.getElementById is evaluated BEFORE
+                // the DOM is fully loaded, which results in error
+                // Cannot read properties of null (reading 'duration')
+                // see https://github.com/jibon57/bbb-recorder/issues/100
+                // Quick fix : wait for 5 seconds before reading the duration
+                await page.waitFor(5000);
+                recDuration = await page.evaluate(() => {
+                    return document.getElementById("vjs_video_3_html5_api").duration
+                });
+            } else {
+                recDuration = await page.evaluate(() => {
+                    return document.getElementById("video").duration
+                });
+            }
+            attempt++;
+            console.log("Attempt: " + attempt);
+        } while (isNaN(recDuration))
 
         // If duration was set to 0 or is greater than recDuration, use recDuration value
         if (duration == 0 || duration > recDuration) {
             duration = recDuration;
         }
-        console.log(duration);
+        console.log("Duration: " + duration);
+        console.log("Rec Duration: " + recDuration);
 
         if (!bbbVersionIs23) {
             await page.waitForSelector('button[class=acorn-play-button]');
@@ -205,7 +210,6 @@ async function main() {
 main()
 
 function convertAndCopy(filename) {
-    console.log("Convert And Copy");
 
     var copyFromPath = homedir + "/Downloads";
     var onlyfileName = filename.split(".webm")
@@ -219,20 +223,21 @@ function convertAndCopy(filename) {
 
     console.log(copyTo);
     console.log(copyFrom);
+    console.log("convertAndCopy");
 
     const ls = spawn('ffmpeg', ['-y',
-            '-i "' + copyFrom + '"',
-            '-c:v libx264',
-            '-preset veryfast',
-            '-movflags faststart',
-            '-profile:v high',
-            '-level 4.2',
-            '-max_muxing_queue_size 9999',
-            '-vf mpdecimate',
-            '-vsync vfr "' + copyTo + '"'
-        ], {
-            shell: true
-        }
+        '-i "' + copyFrom + '"',
+        '-c:v libx264',
+        '-preset veryfast',
+        '-movflags faststart',
+        '-profile:v high',
+        '-level 4.2',
+        '-max_muxing_queue_size 9999',
+        '-vf mpdecimate',
+        '-vsync vfr "' + copyTo + '"'
+    ], {
+        shell: true
+    }
 
     );
 
@@ -257,7 +262,8 @@ function convertAndCopy(filename) {
 }
 
 function copyOnly(filename) {
-    console.log("Copy Only");
+
+    console.log("Copy");
 
     var copyFrom = homedir + "/Downloads/" + filename;
     var copyTo = copyToPath + "/" + filename;
