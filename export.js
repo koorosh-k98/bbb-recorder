@@ -156,8 +156,12 @@ async function main() {
         if (duration == 0 || duration > recDuration) {
             duration = recDuration;
         }
-        console.log("Duration: " + duration);
-        console.log("Rec Duration: " + recDuration);
+        console.log("Duration: " + (duration/60).toFixed(2) +" Min");
+        console.log("Rec Duration: " + (recDuration/60 ).toFixed(2)+" Min");
+
+        var t = new Date();
+        var fTime = new Date(t.setSeconds(t.getSeconds() + recDuration));
+        console.log("Finish time: " + fTime.toLocaleTimeString());
 
         if (!bbbVersionIs23) {
             await page.waitForSelector('button[class=acorn-play-button]');
