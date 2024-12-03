@@ -180,8 +180,25 @@ async function main() {
     console.log("Rec Duration: " + (recDuration / 60).toFixed(2) + " Min");
 
     var t = new Date();
-    var fTime = new Date(t.setSeconds(t.getSeconds() + duration));
-    console.log("Finish time: " + fTime.toLocaleTimeString());
+
+    // Get the current time in milliseconds since Jan 1, 1970
+    const localTime = t.getTime();
+
+    // Get the local UTC offset in milliseconds
+    const localOffset = t.getTimezoneOffset() * 60000;
+
+    // Get the current UTC time in milliseconds
+    const utcTime = localTime + localOffset;
+
+    // Iran's UTC offset (UTC+3:30 or UTC+4:30 during daylight saving)
+    const iranOffset = t.getTimezoneOffset() === -210 ? 12600000 : 16200000;
+
+    // Get the current time in Iran
+    const iranTime = new Date(utcTime + iranOffset);
+
+    const iranFinishTime = new Date(iranTime + duration * 1000);
+
+    console.log("Finish time: " + iranFinishTime.toLocaleTimeString());
 
     if (!bbbVersionIs23) {
       await page.waitForSelector("button[class=acorn-play-button]");
