@@ -91,7 +91,7 @@ async function main() {
         : url.split("=")[1] + ".webm";
     }
 
-    var duration = process.argv[4];
+    var duration = parseInt(process.argv[4]);
     // If duration isn't defined, set it in 0
     if (!duration) {
       duration = 0;
@@ -149,7 +149,7 @@ async function main() {
       process.exit(1);
     }
 
-    var recDuration;
+    var sessionDuration;
     var attempt = 0;
     do {
       // Get recording duration
@@ -160,31 +160,30 @@ async function main() {
         // see https://github.com/jibon57/bbb-recorder/issues/100
         // Quick fix : wait for 5 seconds before reading the duration
         await page.waitFor(5000);
-        recDuration = await page.evaluate(() => {
+        sessionDuration = await page.evaluate(() => {
           return document.getElementById("vjs_video_3_html5_api").duration;
         });
       } else {
-        recDuration = await page.evaluate(() => {
+        sessionDuration = await page.evaluate(() => {
           return document.getElementById("video").duration;
         });
       }
       attempt++;
-      console.log("Attempt: " + attempt);
-    } while (isNaN(recDuration));
+      console.log("Attempt(s): " + attempt);
+    } while (isNaN(sessionDuration));
 
-    // If duration was set to 0 or is greater than recDuration, use recDuration value
-    if (duration == 0 || duration > recDuration) {
-      duration = recDuration;
+    // If duration was set to 0 or is greater than sessionDuration, use sessionDuration value
+    if (duration == 0 || duration > sessionDuration) {
+      duration = sessionDuration;
     }
-    console.log("Duration: " + (duration / 60).toFixed(2) + " Min");
-    console.log("Rec Duration: " + (recDuration / 60).toFixed(2) + " Min");
+    console.log("Recording Duration: " + (duration / 60).toFixed(2) + " Min");
+    console.log("Session Duration: " + (sessionDuration / 60).toFixed(2) + " Min");
 
     var t = new Date();
-    var fTime = new Date(t.setSeconds(t.getSeconds() + duration));
-    console.log(
-      "Finish time: " +
-        fTime.toLocaleString("en-US", { timeZone: "Asia/Tehran" })
-    );
+    console.log("Current time: " + t.toLocaleString("en-US", { timeZone: "Asia/Tehran" }));
+    
+    var fTime = new Date(t.setSeconds(t.getSeconds() + duration));    
+    console.log("Finish time: " + fTime.toLocaleString("en-US", { timeZone: "Asia/Tehran" }));
 
     if (!bbbVersionIs23) {
       await page.waitForSelector("button[class=acorn-play-button]");
