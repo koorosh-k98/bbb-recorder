@@ -12,7 +12,7 @@ var xvfb = new Xvfb({
   xvfb_args: [
     "-screen",
     "0",
-    "1280x800x24",
+    "1920x1080x24",
     "-ac",
     "-nolisten",
     "tcp",
@@ -22,8 +22,8 @@ var xvfb = new Xvfb({
     "RANDR",
   ],
 });
-var width = 1280;
-var height = 720;
+var width = 1920;
+var height = 1080;
 var options = {
   headless: false,
   args: [
@@ -277,12 +277,16 @@ function convertAndCopy(filename) {
       "-y",
       '-i "' + copyFrom + '"',
       "-c:v libx264",
-      "-preset veryfast",
+      "-preset medium",
+      "-crf 18",
       "-movflags faststart",
       "-profile:v high",
       "-level 4.2",
       "-max_muxing_queue_size 9999",
       "-vf mpdecimate",
+      "-pix_fmt yuv420p",
+      "-c:a aac",
+      "-b:a 192k",
       '-vsync vfr "' + copyTo + '"',
     ],
     {

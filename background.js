@@ -53,10 +53,10 @@ chrome.runtime.onConnect.addListener(port => {
                             mandatory: {
                                 chromeMediaSource: 'desktop',
                                 chromeMediaSourceId: streamId,
-                                minWidth: 1280,
-                                maxWidth: 1280,
-                                minHeight: 720,
-                                maxHeight: 720,
+                                minWidth: 1920,
+                                maxWidth: 1920,
+                                minHeight: 1080,
+                                maxHeight: 1080,
                                 minFrameRate: 60,
                             }
                         }
