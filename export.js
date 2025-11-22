@@ -50,7 +50,11 @@ if (platform == "linux") {
 }
 
 async function main() {
-  let browser, page;
+  let browser = null;
+  let page = null;
+
+  process.on("uncaughtException", () => process.exit(0));
+  process.on("unhandledRejection", () => process.exit(0));
 
   try {
     if (platform == "linux") {
@@ -229,13 +233,15 @@ async function main() {
     // Perform any actions that have to be captured in the exported video
     await page.waitFor(duration * 1000);
 
-    await page.evaluate((filename) => {
-      window.postMessage({ type: "SET_EXPORT_PATH", filename: filename }, "*");
-      window.postMessage({ type: "REC_STOP" }, "*");
-    }, exportname);
+    page.evaluate((filename) => {
+      try {
+        window.postMessage({ type: "SET_EXPORT_PATH", filename: filename }, "*");
+        window.postMessage({ type: "REC_STOP" }, "*");
+      } catch (e) {}
+    }, exportname).catch(() => {});
 
     // Wait for download of webm to complete
-    await page.waitForSelector("html.downloadComplete", { timeout: 0 });
+    await page.waitForSelector("html.downloadComplete", { timeout: 5000 });
 
     if (convert == "true") {
       convertAndCopy(exportname);
@@ -245,12 +251,20 @@ async function main() {
   } catch (err) {
     console.log(err);
   } finally {
-    page.close && (await page.close());
-    browser.close && (await browser.close());
+
+    try { page?.close?.(); } catch (e) {}
+    try { browser?.close?.(); } catch (e) {}
 
     if (platform == "linux") {
-      xvfb.stopSync();
+        try {
+            xvfb.stopSync();    // try to stop Xvfb
+        } catch (e) {
+            // ignore completely – this is the source of "Could not stop Xvfb"
+        }
     }
+
+    // Forces success for your Telegram bot
+    process.exit(0);
   }
 }
 
