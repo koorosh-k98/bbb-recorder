@@ -6,7 +6,7 @@ const fsp = fs.promises;
 const path = require('path');
 
 const logFile = fs.createWriteStream(path.join(__dirname, 'telegram_bot.log'), { flags: 'a' });
-const queues = ["queue.txt", "queue2.txt"];
+const queues = ["queue.txt"];
 
 function log(message) {
   const timestamp = new Date().toLocaleString("en-US", { timeZone: "Asia/Tehran" });
@@ -29,24 +29,27 @@ async function addToQueue(chatId, filename, url) {
   const timestamp = new Date().toLocaleString("en-US", { timeZone: "Asia/Tehran" });
   const content = `[${timestamp}],${chatId},${filename},${url},false\n`;
 
-  let queuesLine = [];
-  // Adds to the file which has fewer lines
-  for (let i = 0; i < queues.length; i++) {
-    queuesLine[i] = await lineCount(queues[i])
-  }
+  // let queuesLine = [];
+  // // Adds to the file which has fewer lines
+  // for (let i = 0; i < queues.length; i++) {
+  //   queuesLine[i] = await lineCount(queues[i])
+  // }
 
-  let minLines = queuesLine[0];
-  let queue = queues[0];
+  // let minLines = queuesLine[0];
+  // let queue = queues[0];
 
 
-  for (let i = 0; i < queues.length; i++) {
-    if (queuesLine[i] < minLines) {
-      minLines = queuesLine[i];
-      queue = queues[i]
-    }
-  }
+  // for (let i = 0; i < queues.length; i++) {
+  //   if (queuesLine[i] < minLines) {
+  //     minLines = queuesLine[i];
+  //     queue = queues[i]
+  //   }
+  // }
 
-  await fsp.appendFile(queue, content);
+  // await fsp.appendFile(queue, content);
+
+
+  await fsp.appendFile(queues[0], content);
 }
 
 const token = process.env.BOT_TOKEN?.trim();
