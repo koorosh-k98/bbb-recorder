@@ -21,7 +21,7 @@ const bot = new Bot(token, {
 
 console.log("Running...")
 
-const queues = ["queue.txt", "queue2.txt"];
+const queues = ["queue.txt"];
 
 async function readFirstLine(qPath) {
     try {
@@ -76,7 +76,9 @@ function runRecorder(url, filename, chatId, qPath) {
         }
     });
 
-    // child.on("close", async () => {});
+    child.on("close", async () => {
+        await setRecording(qPath, false);
+    });
 }
 
 async function sendFileToUser(chatId, filePath, fileName) {
@@ -109,23 +111,26 @@ async function readFromQueue(qPath) {
 }
 
 async function handleQueues() {
-    // Argument passed when running the script, defines which queue should be used to record the session
-    const q = process.argv[2];
 
-    if (q === "1" || q === "2") {
-        if (q === "1") {
-            await readFromQueue(queues[0]);
-        } else {
-            await readFromQueue(queues[1]);
-        }
-    }
-    else {
-        console.log("Invalid argument!")
-        process.exit(1);
-    }
+    // If you had powerful machines that can handle more than one session recording at a time
+    // // Argument passed when running the script, defines which queue should be used to record the session
+    // const q = process.argv[2];
 
+    // if (q === "1" || q === "2") {
+    //     if (q === "1") {
+    //         await readFromQueue(queues[0]);
+    //     } else {
+    //         await readFromQueue(queues[1]);
+    //     }
+    // }
+    // else {
+    //     console.log("Invalid argument!")
+    //     process.exit(1);
+    // }
+
+    await readFromQueue(queues[0]);
 }
 
-cron.schedule("*/60 * * * * *", async () => {
+cron.schedule("*/5 * * * *", async () => {
     await handleQueues();
 });
