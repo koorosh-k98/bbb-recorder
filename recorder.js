@@ -62,7 +62,7 @@ async function setRecording(qPath, value) {
 
 function runRecorder(url, filename, chatId, qPath) {
     console.log(url, filename, chatId)
-    const child = spawn("node", ["export.js", url, filename + ".webm", 10, false]);
+    const child = spawn("node", ["export.js", url, filename + ".webm", 0, false]);
 
     child.stdout.on("data", async (data) => {
         console.log(`Output: ${data}`);
