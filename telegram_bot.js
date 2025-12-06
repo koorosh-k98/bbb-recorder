@@ -9,6 +9,7 @@ const { copyToPath } = require("./env");
 const logFile = fs.createWriteStream(path.join(__dirname, 'telegram_bot.log'), { flags: 'a' });
 const queues = ["queue.txt"];
 const matcher = ["matcher.txt"];
+const recipients = ["recipients.txt"];
 
 function log(message) {
   const timestamp = new Date().toLocaleString("en-US", { timeZone: "Asia/Tehran" });
@@ -29,48 +30,34 @@ function log(message) {
 
 async function addToQueue(chatId, filename, url) {
   const timestamp = new Date().toLocaleString("en-US", { timeZone: "Asia/Tehran" });
-  const matcherContent = `${url},${filename}\n`;
+  const matcherContent = `${url},${filename}`;
   const content = `[${timestamp}],${chatId},${filename},${url},false\n`;
 
   // If the recorded file exists
-  let lines = (await fsp.readFile(matcher[0], "utf-8")).trim().split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    let splited = lines[i].split(",");
+  // let lines = (await fsp.readFile(matcher[0], "utf-8")).trim().split("\n");
+  // for (let i = 0; i < lines.length; i++) {
+  //   let splited = lines[i].split(",");
 
-    if (splited[0] === url) {
-      let fName = splited[1];
-      const requestedFilePath = path.join(copyToPath, filename + ".webm");
-      const recordedFilePath = path.join(copyToPath, fName + ".webm");
-      if (fs.existsSync(recordedFilePath)) {
-        fs.rename(recordedFilePath, requestedFilePath, (err) => {
-          if (err) {
-            console.error('Error renaming file:', err);
-            return;
-          }
-          console.log('File renamed successfully!');
-        });
+  //   if (splited[0] === url) {
+  //     let fName = splited[1];
+  //     const requestedFilePath = path.join(copyToPath, filename + ".webm");
+  //     const recordedFilePath = path.join(copyToPath, fName + ".webm");
+  //     if (fs.existsSync(recordedFilePath)) {
+  //       fs.rename(recordedFilePath, requestedFilePath, (err) => {
+  //         if (err) {
+  //           console.error('Error renaming file:', err);
+  //           return;
+  //         }
+  //         console.log('File renamed successfully!');
+  //       });
 
-        await bot.api.sendDocument(chatId, new InputFile(requestedFilePath), {
-          caption: `📹 ${filename}`
-        });
+  //       lines[i] = matcherContent;
+  //       await fsp.writeFile(matcher[0], lines.join("\n"));
 
-        if (chatId != process.env.CREATOR_CHAT_ID) {
-
-          const user = await bot.api.getChat(chatId);
-          const username = user.username ? `@${user.username}` : "no username";
-
-          await bot.api.sendDocument(process.env.CREATOR_CHAT_ID, new InputFile(requestedFilePath), {
-            caption: `📹 ${filename} - ${username}`
-          });
-        }
-
-        lines[i] = `${url},${filename}`
-        await fsp.writeFile(matcher[0], lines.join("\n") + "\n");
-
-        return;
-      }
-    }
-  }
+  //       return;
+  //     }
+  //   }
+  // }
 
   // let queuesLine = [];
   // // Adds to the file which has fewer lines
@@ -91,8 +78,27 @@ async function addToQueue(chatId, filename, url) {
 
   // await fsp.appendFile(queue, content);
 
-  await fsp.appendFile(matcher[0], matcherContent);
-  await fsp.appendFile(queues[0], content);
+  // Unique matcher content based on url
+  let lines = (await fsp.readFile(matcher[0], "utf-8")).trim().split("\n");
+  const alreadyExists = lines.some(line => line.startsWith(url + ","));
+
+  if (!alreadyExists) {
+    await fsp.appendFile(matcher[0], matcherContent + "\n");
+  }
+
+  // Add it to recipients
+  const c = `${url},${filename},${chatId}`;
+  await fsp.appendFile(recipients[0], c + "\n");
+
+  lines = (await fsp.readFile(queues[0], "utf-8")).trim().split("\n");
+  const alreadyRecording = lines.some(line => {
+    const [date, time, chatId, fileName, recordUrl, isRecordingStr] = line.split(",");
+    return recordUrl === url;
+  });
+
+  if (!alreadyRecording) {
+    await fsp.appendFile(queues[0], content);
+  }
 }
 
 const token = process.env.BOT_TOKEN?.trim();
@@ -128,7 +134,7 @@ async function bbbRecordingConversation(conversation, ctx) {
     }
 
     const validateText = (value) => {
-      if (/^[a-zA-Z0-9\s'-]{1,40}$/.test(value)) return value.replace(/\s+/g, "-");
+      if (/^[a-zA-Z0-9\s'-]{1,40}$/.test(value)) return value.replace(/\s+/g, " ");
       throw new Error("Invalid input! Only letters and numbers, max 40 chars.");
     }
 
