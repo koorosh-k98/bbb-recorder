@@ -7,8 +7,10 @@ const cron = require("node-cron");
 const { spawn } = require("child_process");
 const { copyToPath } = require("./env");
 const FOLDER_TO_WATCH = copyToPath;
-const MAX_FILES = 10;
+const MAX_FILES = 8;
+const RECORD_TIME = 0; // Seconds (0 means the whole session)
 const matcher = ["matcher.txt"];
+const recipients = ["recipients.txt"];
 
 const token = process.env.BOT_TOKEN?.trim();
 if (!token) {
@@ -62,7 +64,7 @@ async function setRecording(qPath, value) {
 
 function runRecorder(url, filename, chatId, qPath) {
     console.log(url, filename, chatId)
-    const child = spawn("node", ["export.js", url, filename + ".webm", 0, false]);
+    const child = spawn("node", ["export.js", url, filename + ".webm", RECORD_TIME, false]);
 
     child.stdout.on("data", async (data) => {
         console.log(`Output: ${data}`);
@@ -90,15 +92,72 @@ async function sendFileToUser(chatId, filePath, fileName) {
     });
 
     if (chatId != process.env.CREATOR_CHAT_ID) {
-
         const user = await bot.api.getChat(chatId);
         const username = user.username ? `@${user.username}` : "no username";
 
-        await bot.api.sendDocument(process.env.CREATOR_CHAT_ID, new InputFile(requestedFilePath), {
+        await bot.api.sendDocument(process.env.CREATOR_CHAT_ID, new InputFile(filePath), {
             caption: `📹 ${fileName} - ${username}`
         });
     }
-    // fs.unlinkSync(filePath)
+}
+
+async function sendFileToUsers() {
+    const matcherContent = await fsp.readFile(matcher[0], "utf-8");
+    const recipientsContent = await fsp.readFile(recipients[0], "utf-8");
+
+    let matcherLines = matcherContent.split("\n").filter(Boolean);
+    let recipientsLines = recipientsContent.split("\n").filter(Boolean);
+
+    // Build a map: url → current recorded filename
+    const matcherMap = new Map();
+    for (const line of matcherLines) {
+        const [url, name] = line.split(",").map(s => s.trim());
+        if (url && name) matcherMap.set(url, name);
+    }
+
+    const stillPendingRecipients = [];
+    let hasSentAnything = false;
+
+    for (const line of recipientsLines) {
+        const [rUrl, rFileName, rChatId] = line.split(",").map(s => s.trim());
+        if (!rUrl || !rFileName || !rChatId) {
+            stillPendingRecipients.push(line);
+            continue;
+        }
+
+        const recordedName = matcherMap.get(rUrl);
+        if (!recordedName) {
+            stillPendingRecipients.push(line);
+            continue;
+        }
+
+        const oldFileName = recordedName + ".webm";
+        const newFileName = rFileName + ".webm";
+        const oldPath = path.join(FOLDER_TO_WATCH, oldFileName);
+        const newPath = path.join(FOLDER_TO_WATCH, newFileName);
+
+        if (!fs.existsSync(oldPath)) {
+            stillPendingRecipients.push(line);
+            continue;
+        }
+
+        // Success! File exists → rename and send
+        await fsp.rename(oldPath, newPath);
+        await sendFileToUser(rChatId, newPath, rFileName);
+        hasSentAnything = true;
+
+        // Update matcher: this URL now has the final name
+        matcherMap.set(rUrl, rFileName);
+    }
+
+    // Only write files back if something actually changed
+    if (hasSentAnything) {
+        const newMatcherLines = Array.from(matcherMap.entries())
+            .map(([url, name]) => `${url},${name}`);
+
+        await fsp.writeFile(matcher[0], newMatcherLines.join("\n") + "\n");
+        await fsp.writeFile(recipients[0], stillPendingRecipients.join("\n") + "\n");
+    }
 }
 
 async function readFromQueue(qPath) {
@@ -112,7 +171,7 @@ async function readFromQueue(qPath) {
 
     // File ready
     if (fs.existsSync(recordedFilePath)) {
-        await sendFileToUser(chatId, recordedFilePath, fileName);
+        // await sendFileToUser(chatId, recordedFilePath, fileName);
         await deleteFirstLine(qPath);
         return;
     }
@@ -146,10 +205,10 @@ async function handleQueues() {
 
 async function cleanupOldFiles() {
     try {
-        const files = await fsp.readdir(FOLDER_TO_WATCH);
+        let files = await fsp.readdir(FOLDER_TO_WATCH);
 
         // Filter out directories, keep only files
-        const fileStats = await Promise.all(
+        let fileStats = await Promise.all(
             files.map(async (file) => {
                 const fullPath = path.join(FOLDER_TO_WATCH, file);
                 const stats = await fsp.stat(fullPath);
@@ -157,61 +216,43 @@ async function cleanupOldFiles() {
             })
         );
 
-        const validFiles = fileStats
-            .filter(Boolean)
-            .sort((a, b) => b.mtime - a.mtime); // Newest first
+        let validFiles = fileStats.filter(Boolean).sort((a, b) => b.mtime - a.mtime); // Newest first
 
-        if (validFiles.length <= MAX_FILES) {
-            console.log(`Only ${validFiles.length} files → nothing to delete`);
-            return;
-        }
+        if (validFiles.length <= MAX_FILES) return;
 
         const filesToDelete = validFiles.slice(MAX_FILES);
         console.log(`Found ${validFiles.length} files → deleting ${filesToDelete.length} oldest...`);
 
         for (const file of filesToDelete) {
             try {
+                //Delete file
                 await fsp.unlink(file.path);
+
+                // Delete from matcher as well
+                let fileName = file.name.replace(".webm", "")
+                let lines = (await fsp.readFile(matcher[0], "utf-8")).split("\n");
+
+                let remainedLines = lines.filter(line => {
+                    const parts = line.split(",");
+                    return fileName != parts[1]
+                })
+
+                await fsp.writeFile(matcher[0], remainedLines.join("\n") + "\n");
+
                 console.log(`Deleted: ${file.name} (modified: ${file.mtime.toLocaleString()})`);
             } catch (err) {
                 console.error(`Failed to delete ${file.name}:`, err.message);
             }
         }
-
-        // Delete from matcher as well
-        try {
-            const remainingFiles = validFiles.slice(0, MAX_FILES);
-            const keptNames = remainingFiles.map(f => f.name.replace(".webm", ""));
-
-            let content = await fsp.readFile(matcher[0], "utf-8");
-            const lines = content.split("\n");
-
-            const cleanedLines = lines.filter(line => {
-                if (!line.trim()) return true;
-                const parts = line.split(",");
-                if (parts.length < 2) return true;
-                return keptNames.includes(parts[1].trim());
-            });
-
-            await fsp.writeFile(matcher[0], cleanedLines.join("\n").trim() + "\n");
-            console.log(`Matcher file updated → ${cleanedLines.filter(l => l.trim()).length} entries kept`);
-        } catch (err) {
-            console.error("Failed to update matcher file:", err.message);
-        }
-
-
         console.log(`Cleanup complete. Now keeping ${MAX_FILES} newest files.\n`);
     } catch (err) {
         console.error('Error during cleanup:', err.message);
     }
 }
 
-// cron.schedule("*/15 * * * * *", async () => {
-//     await handleQueues();
-//     await cleanupOldFiles();
-// });
-
+// Every Five Minutes "*/5 * * * *"
 cron.schedule("*/5 * * * *", async () => {
     await handleQueues();
+    await sendFileToUsers()
     await cleanupOldFiles();
 });
