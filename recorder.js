@@ -49,6 +49,18 @@ async function deleteFirstLine(qPath) {
     } catch { }
 }
 
+
+async function deleteFromFile(filePath, fileName) {
+    let lines = (await fsp.readFile(filePath, "utf-8")).split("\n");
+
+    let remainedLines = lines.filter(line => {
+        const parts = line.split(",");
+        return fileName != parts[1]
+    })
+
+    await fsp.writeFile(filePath, remainedLines.join("\n") + "\n");
+}
+
 async function setRecording(qPath, value) {
     try {
         let lines = (await fsp.readFile(qPath, "utf-8")).trim().split("\n");
@@ -78,6 +90,8 @@ function runRecorder(url, filename, chatId, qPath) {
 
         if (err === "Invalid recording URL!" || err === "Recording URL unreachable!") {
             await deleteFirstLine(qPath);
+            await deleteFromFile(matcher[0], filename)
+            await deleteFromFile(recipients[0], filename)
         }
     });
 
@@ -171,7 +185,6 @@ async function readFromQueue(qPath) {
 
     // File ready
     if (fs.existsSync(recordedFilePath)) {
-        // await sendFileToUser(chatId, recordedFilePath, fileName);
         await deleteFirstLine(qPath);
         return;
     }
@@ -224,25 +237,12 @@ async function cleanupOldFiles() {
         console.log(`Found ${validFiles.length} files → deleting ${filesToDelete.length} oldest...`);
 
         for (const file of filesToDelete) {
-            try {
-                //Delete file
-                await fsp.unlink(file.path);
+            //Delete file
+            await fsp.unlink(file.path);
 
-                // Delete from matcher as well
-                let fileName = file.name.replace(".webm", "")
-                let lines = (await fsp.readFile(matcher[0], "utf-8")).split("\n");
-
-                let remainedLines = lines.filter(line => {
-                    const parts = line.split(",");
-                    return fileName != parts[1]
-                })
-
-                await fsp.writeFile(matcher[0], remainedLines.join("\n") + "\n");
-
-                console.log(`Deleted: ${file.name} (modified: ${file.mtime.toLocaleString()})`);
-            } catch (err) {
-                console.error(`Failed to delete ${file.name}:`, err.message);
-            }
+            // Delete from matcher as well
+            let fileName = file.name.replace(".webm", "")
+            await deleteFromFile(matcher[0], fileName);
         }
         console.log(`Cleanup complete. Now keeping ${MAX_FILES} newest files.\n`);
     } catch (err) {

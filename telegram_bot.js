@@ -5,6 +5,7 @@ const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
 const { copyToPath } = require("./env");
+const FOLDER_TO_WATCH = copyToPath;
 
 const logFile = fs.createWriteStream(path.join(__dirname, 'telegram_bot.log'), { flags: 'a' });
 const queues = ["queue.txt"];
@@ -33,32 +34,6 @@ async function addToQueue(chatId, filename, url) {
   const matcherContent = `${url},${filename}`;
   const content = `[${timestamp}],${chatId},${filename},${url},false\n`;
 
-  // If the recorded file exists
-  // let lines = (await fsp.readFile(matcher[0], "utf-8")).trim().split("\n");
-  // for (let i = 0; i < lines.length; i++) {
-  //   let splited = lines[i].split(",");
-
-  //   if (splited[0] === url) {
-  //     let fName = splited[1];
-  //     const requestedFilePath = path.join(copyToPath, filename + ".webm");
-  //     const recordedFilePath = path.join(copyToPath, fName + ".webm");
-  //     if (fs.existsSync(recordedFilePath)) {
-  //       fs.rename(recordedFilePath, requestedFilePath, (err) => {
-  //         if (err) {
-  //           console.error('Error renaming file:', err);
-  //           return;
-  //         }
-  //         console.log('File renamed successfully!');
-  //       });
-
-  //       lines[i] = matcherContent;
-  //       await fsp.writeFile(matcher[0], lines.join("\n"));
-
-  //       return;
-  //     }
-  //   }
-  // }
-
   // let queuesLine = [];
   // // Adds to the file which has fewer lines
   // for (let i = 0; i < queues.length; i++) {
@@ -80,9 +55,9 @@ async function addToQueue(chatId, filename, url) {
 
   // Unique matcher content based on url
   let lines = (await fsp.readFile(matcher[0], "utf-8")).trim().split("\n");
-  const alreadyExists = lines.some(line => line.startsWith(url + ","));
+  const alreadyMatched = lines.some(line => line.startsWith(url + ","));
 
-  if (!alreadyExists) {
+  if (!alreadyMatched) {
     await fsp.appendFile(matcher[0], matcherContent + "\n");
   }
 
@@ -96,7 +71,18 @@ async function addToQueue(chatId, filename, url) {
     return recordUrl === url;
   });
 
-  if (!alreadyRecording) {
+  let files = await fsp.readdir(FOLDER_TO_WATCH);
+  let newFileExists = files.includes(filename + ".webm")
+  lines = (await fsp.readFile(matcher[0], "utf-8")).trim().split("\n");
+  let oldFileExists = lines.some(line => {
+    const parts = line.split(",");
+    if (parts[0] === url) {
+      return files.includes(parts[1] + ".webm")
+    }
+    return false;
+  })
+
+  if (!alreadyRecording && !newFileExists && !oldFileExists) {
     await fsp.appendFile(queues[0], content);
   }
 }
