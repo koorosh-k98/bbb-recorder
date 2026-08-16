@@ -133,6 +133,8 @@ docker-compose up
 
 When you will run the command that time `Chrome` browser will be open in background & visit the link to perform screen recording. So, if you have set 10 seconds then it will record 10 seconds only. Later it will give you file as webm or mp4.
 
+Before capture starts, recorder checks BBB `button[aria-label="Toggle theme"]` and switches page to dark theme when needed. This applies to recording export, live recording, and live RTMP flows. If theme button or dark-state icon is unavailable, recorder stops without starting capture.
+
 **Note: It will use extra CPU to process chrome & ffmpeg.**
 
 ## Looking for Bigbluebutton shared hosting?
