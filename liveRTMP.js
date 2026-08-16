@@ -3,6 +3,7 @@ const Xvfb      = require('xvfb');
 var exec = require('child_process').exec;
 const fs = require('fs');
 const { ffmpegServer, ffmpegServerPort, auth } = require('./env');
+const { ensureDarkTheme } = require('./darkTheme');
 const os = require('os');
 const homedir = os.homedir();
 const platform = os.platform();
@@ -77,10 +78,12 @@ async function main() {
         await page.waitForSelector('[id="chat-toggle-button"]');
         await page.click('[id="chat-toggle-button"]', {waitUntil: 'domcontentloaded'});
         await page.click('button[aria-label="Users and messages toggle"]', {waitUntil: 'domcontentloaded'});
-        await page.$eval('[class^=navbar]', element => element.style.display = "none");
 
-        await page.$eval('.Toastify', element => element.style.display = "none");
         await page.waitForSelector('button[aria-label="Change/Leave audio"]');
+        await ensureDarkTheme(page);
+        await page.waitForSelector('button[aria-label="Change/Leave audio"]');
+        await page.$eval('[class^=navbar]', element => element.style.display = "none");
+        await page.$eval('.Toastify', element => element.style.display = "none");
         await page.$eval('[class^=actionsbar] > [class^=center]', element => element.style.display = "none");
         await page.mouse.move(0, 700);
         await page.addStyleTag({content: '@keyframes refresh {0%{ opacity: 1 } 100% { opacity: 0.99 }} body { animation: refresh .01s infinite }'});
@@ -111,6 +114,7 @@ async function main() {
 
     }catch(err) {
         console.log(err)
+        process.exitCode = 1
     } finally {
         page.close && await page.close()
         browser.close && await browser.close()

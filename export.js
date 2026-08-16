@@ -5,6 +5,7 @@ const os = require("os");
 const homedir = os.homedir();
 const platform = os.platform();
 const { copyToPath, playbackFile } = require("./env");
+const { ensureDarkTheme } = require("./darkTheme");
 const spawn = require("child_process").spawn;
 
 var xvfb = new Xvfb({
@@ -186,8 +187,10 @@ async function main() {
     var t = new Date();
     console.log("Current time: " + t.toLocaleString("en-US", { timeZone: "Asia/Tehran" }));
     
-    var fTime = new Date(t.setSeconds(t.getSeconds() + duration));    
+    var fTime = new Date(t.setSeconds(t.getSeconds() + duration));
     console.log("Finish time: " + fTime.toLocaleString("en-US", { timeZone: "Asia/Tehran" }));
+
+    await ensureDarkTheme(page);
 
     if (!bbbVersionIs23) {
       await page.waitForSelector("button[class=acorn-play-button]");
@@ -250,6 +253,7 @@ async function main() {
     }
   } catch (err) {
     console.log(err);
+    process.exitCode = 1;
   } finally {
 
     try { page?.close?.(); } catch (e) {}
@@ -263,8 +267,7 @@ async function main() {
         }
     }
 
-    // Forces success for your Telegram bot
-    process.exit(0);
+    process.exit(process.exitCode || 0);
   }
 }
 
